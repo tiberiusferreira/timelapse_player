@@ -8,17 +8,18 @@
 
     <link rel="icon" type="image/png" href="/public/favicon.png">
 
-    <title>A Title</title>
+    <title>Skynet</title>
 
     </head>
+    <body style="width: 100vw; box-sizing: border-box; margin: 0; padding: 10px">
 
-    <body>
         <section id="app"></section>
         <script type="module">
             // https://rustwasm.github.io/docs/wasm-bindgen/examples/without-a-bundler.html
             import init from '/pkg/package.js';
             init('/pkg/package_bg.wasm');
         </script>
+
 
     </body>
 </html>
