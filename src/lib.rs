@@ -155,7 +155,7 @@ fn view(model: &Model) -> impl View<Msg> {
         event_listeners,
         attrs! {
             At::Width => "100%",
-            At::Height => "60px",
+            At::Height => "100%",
             At::ViewBox => "0 0 100 600",
             At::PreserveAspectRatio => "none",
         },
@@ -225,15 +225,17 @@ fn view(model: &Model) -> impl View<Msg> {
     ];
 
     div![
-        style! {St::Width => "80%", St::Overflow => "hidden", St::Margin => "auto"},
+        style! {St::Width => "100%", St::Height => "100%", St::Overflow => "hidden", St::Margin => "auto"},
         video![
             el_ref(&model.video),
-            attrs! {At::Width => "100%", At::Controls => ""},
+            attrs! {At::Width => "100%", At::Height => "80%", At::Controls => ""},
+            style! {St::Margin => "auto"},
             source![
-                attrs! {At::Src => "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4", At::Type => "video/mp4"}
+                // attrs! {At::Src => "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4", At::Type => "video/mp4"}
+                attrs! {At::Src => "http://192.168.15.29:8001/stream", At::Type => "video/mp4"}
             ]
         ],
-        div![attrs! {At::Id => "video_timeline"}, video_timeline],
+        div![style! {St::Height => "20%"},attrs! {At::Id => "video_timeline"}, video_timeline],
     ]
 }
 
