@@ -24,6 +24,7 @@ features = [
     "SvgMatrix",
     "Document",
     "Element",
+    "ShadowRoot"
 ]
 
 # For serialization, eg sending requests to a server. Otherwise, not required.

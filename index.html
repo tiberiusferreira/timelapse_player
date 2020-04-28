@@ -10,6 +10,20 @@
 
     <title>Skynet</title>
     </head>
+    <style>
+        #video_controls:hover{
+            opacity: 1;
+        }
+        #video_controls:not(hover){
+            opacity: 0.0;
+        }
+        #video_controls{
+            transition-property: opacity;
+            transition-duration: 0.2s;
+            transition-delay: 0s;
+            transition-timing-function: linear;
+        }
+    </style>
     <body style="width: 100vw; height:100vh; box-sizing: border-box; margin: 0; padding: 0.5%">
 
         <section id="app" style="width: 100%; height: 100%"></section>
