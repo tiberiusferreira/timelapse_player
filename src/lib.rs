@@ -3,24 +3,18 @@ use web_sys::*;
 
 struct Model {
     pub video: ElRef<HtmlVideoElement>,
-    pub video_timeline: ElRef<SvgsvgElement>,
+    pub video_container: ElRef<Element>,
+    // pub video_timeline: ElRef<SvgsvgElement>,
     pub percentage_watched: f64,
-    pub moving_left_cursor: bool,
-    pub cursor_left_pos: f64,
-    pub moving_right_cursor: bool,
-    pub cursor_right_pos: f64,
 }
 
 impl Default for Model {
     fn default() -> Self {
         Self {
             video: ElRef::default(),
-            video_timeline: ElRef::default(),
+            video_container: ElRef::default(),
+            // video_timeline: ElRef::default(),
             percentage_watched: 0.,
-            moving_left_cursor: false,
-            cursor_left_pos: 5.,
-            moving_right_cursor: false,
-            cursor_right_pos: 90.,
         }
     }
 }
@@ -28,214 +22,148 @@ impl Default for Model {
 #[derive(Clone)]
 enum Msg {
     SetTime(web_sys::PointerEvent),
-    SetTimeZoom(web_sys::PointerEvent),
-    GrabbedLeft,
-    GrabbedRight,
-    PointerMoved(web_sys::PointerEvent),
-    PointerUp(web_sys::PointerEvent),
 }
 
 fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
     match msg {
         Msg::SetTime(event) => {
-            let el = model.video.get().expect("No video el");
-            let total_duration = el.duration();
-            let x = event.client_x();
-            let y = event.client_y();
-            let video_timeline = model.video_timeline.get().unwrap();
-            let p = video_timeline.create_svg_point();
-            p.set_x(x as f32);
-            p.set_y(y as f32);
-            let ctm = video_timeline.get_screen_ctm().unwrap().inverse().unwrap();
-            let k = p.matrix_transform(&ctm);
-            model.percentage_watched = (k.x() as f64 - 5.) * 1.111 / 100.;
-            el.set_current_time(model.percentage_watched * total_duration);
-        }
-        Msg::GrabbedLeft => {
-            log!("Grabbed Left!");
-            // let a = model.cursor_left_el.get().expect("No cursor left");
-            // a.set_pointer_capture(event.pointer_id()).unwrap();
-            model.moving_left_cursor = true;
-        }
-        Msg::PointerUp(_) => {
-            log!("Released All!");
-            model.moving_left_cursor = false;
-            model.moving_right_cursor = false;
-        }
-        Msg::PointerMoved(event) => {
-            log!("Moved!");
-            if model.moving_left_cursor {
-                let x = event.client_x();
-                let y = event.client_y();
-                let video_timeline = model.video_timeline.get().unwrap();
-                let p = video_timeline.create_svg_point();
-                p.set_x(x as f32);
-                p.set_y(y as f32);
-                let ctm = video_timeline.get_screen_ctm().unwrap().inverse().unwrap();
-                let k = p.matrix_transform(&ctm);
-                let x = k.x();
-                model.cursor_left_pos = x as f64;
-            }
-            if model.moving_right_cursor {
-                let x = event.client_x();
-                let y = event.client_y();
-                let video_timeline = model.video_timeline.get().unwrap();
-                let p = video_timeline.create_svg_point();
-                p.set_x(x as f32);
-                p.set_y(y as f32);
-                let ctm = video_timeline.get_screen_ctm().unwrap().inverse().unwrap();
-                let k = p.matrix_transform(&ctm);
-                let x = k.x();
-                model.cursor_right_pos = x as f64;
-                log!("Right Pos: ", model.cursor_right_pos);
-            }
-        }
-        Msg::GrabbedRight => {
-            log!("Grabbed Right!");
-            model.moving_right_cursor = true;
-        }
-        Msg::SetTimeZoom(event) => {
-            let el = model.video.get().expect("No video el");
-            let total_duration = el.duration();
-            let x = event.client_x();
-            let y = event.client_y();
-            let video_timeline = model.video_timeline.get().unwrap();
-            let p = video_timeline.create_svg_point();
-            p.set_x(x as f32);
-            p.set_y(y as f32);
-            let ctm = video_timeline.get_screen_ctm().unwrap().inverse().unwrap();
-            let k = p.matrix_transform(&ctm);
-            let x = k.x() as f64;
-            // 12.5 up to 87.5
-            // 12.5 => left_cursor/100 * total_duration
-            // 87.5 => right_cursor/100 * total_duration
-            // x => ((x-12.5)/(87.5-12.5)/100)*total_duration
-            let window_percentage_watched = (x-12.5)/(87.5-12.5) as f64;
-            let window_left = (model.cursor_left_pos- 5.) * 1.111;
-            let window_right = (model.cursor_right_pos - 5.) * 1.111;
-            let w = window_left + (window_right-window_left)*window_percentage_watched;
-            let w = w/100.;
-            model.percentage_watched = w;
-            el.set_current_time(model.percentage_watched * total_duration);
-            // model.cursor_left_pos = x as f64;
+            // let el = model.video.get().expect("No video el");
+            // let total_duration = el.duration();
+            // let x = event.client_x();
+            // let y = event.client_y();
+            // let video_timeline = model.video_timeline.get().unwrap();
+            // let p = video_timeline.create_svg_point();
+            // p.set_x(x as f32);
+            // p.set_y(y as f32);
+            // let ctm = video_timeline.get_screen_ctm().unwrap().inverse().unwrap();
+            // let k = p.matrix_transform(&ctm);
+            // model.percentage_watched = (k.x() as f64 - 5.) * 1.111 / 100.;
+            // el.set_current_time(model.percentage_watched * total_duration);
         }
     }
 }
 
 fn view(model: &Model) -> impl View<Msg> {
-    let mut lines = vec![];
-    for i in 0..=300 {
-        let stroke_width = 0.125;
-        let x_pos = (i as f32 / 3.0) * 0.9 + stroke_width;
-        let perc_bar = i as f64 / 300.;
-        let color = if model.percentage_watched > perc_bar {
-            "stroke:red; stroke-width:0.125"
-        } else {
-            "stroke:gray; stroke-width:0.125"
-        };
-        lines.push(line_![attrs! {
-            At::X1 => (x_pos+5.).to_string(),
-            At::Y1 => "0",
-            At::X2 => (x_pos+5.).to_string(),
-            At::Y2 => "100",
-            At::Style => color,
-        },]);
-    }
-    let need_move = (model.moving_left_cursor || model.moving_right_cursor);
-    // need these "top" event listeners because Safari does not support pointerCapture API :(
-    let mut event_listeners = vec![
-        pointer_ev("pointerup", Msg::PointerUp),
-        pointer_ev("pointerleave", Msg::PointerUp),
-    ];
-    if need_move {
-        event_listeners.push(pointer_ev("pointermove", Msg::PointerMoved));
-    }
-    let video_timeline = svg![
-        el_ref(&model.video_timeline),
-        event_listeners,
-        attrs! {
-            At::Width => "100%",
-            At::Height => "100%",
-            At::ViewBox => "0 0 100 600",
-            At::PreserveAspectRatio => "none",
+    // let mut lines = vec![];
+    // for i in 0..=300 {
+    //     let stroke_width = 0.125;
+    //     let x_pos = (i as f32 / 3.0) + stroke_width;
+    //     let perc_bar = i as f64 / 300.;
+    //     let color = if model.percentage_watched > perc_bar {
+    //         "stroke:red; stroke-width:0.125"
+    //     } else {
+    //         "stroke:gray; stroke-width:0.125"
+    //     };
+    //     lines.push(line_![attrs! {
+    //         At::X1 => (x_pos).to_string(),
+    //         At::Y1 => "0",
+    //         At::X2 => (x_pos).to_string(),
+    //         At::Y2 => "100",
+    //         At::Style => color,
+    //     },]);
+    // }
+    let video_timeline = div![
+        style! {
+        St::Width => "100%",
+        St::Height => "100%",
+        St::BackgroundColor => "black",
+        St::Position => "relative";},
+        svg![
+        // Play button
+        style! {
+            St::Position => "absolute",
+            St::Top => "7px",
+            St::Left => "10px",
+            St::Height => "26px",
+            St::Width => "26px",
         },
-        style! {St::TouchAction => "none"},
-        g![
-            // main timeline
-            pointer_ev("pointermove", Msg::SetTime),
-            rect![attrs! {
-                At::X => "5",
-                At::Y => "0",
-                At::Width => "90",
-                At::Height => "100",
-                At::FillOpacity => "0.2",
-            },],
-            lines
+        attrs![At::ViewBox => "0 0 26 26", At::Fill => "white"],
+        polygon![attrs![At::Points => "9.33 6.69 9.33 19.39 19.3 13.04 9.33 6.69"]],
+        path![attrs![At::D => "M26,13A13,13,0,1,1,13,0,13,13,0,0,1,26,13ZM13,2.18A10.89,10.89,0,1,0,23.84,13.06,10.89,10.89,0,0,0,13,2.18Z"]]
         ],
-        g![
-            // zoom timeline
-            rect![
-                pointer_ev("pointermove", Msg::SetTimeZoom),
-                attrs! {
-                    At::X => "12.5",
-                    At::Y => "400",
-                    At::Width => "75",
-                    At::Height => "200",
-                    At::FillOpacity => "0.2",
+        div![
+        style! {
+                St::Position => "absolute",
+                St::Top => "0%",
+                St::Bottom => "0%",
+                St::Right => "50px",
+                St::Left => "50px",
+                St::BackgroundColor => "black",
                 },
-            ],
-            // lines
+        div![
+            style! {
+                St::Position => "absolute",
+                St::Top => "45%",
+                St::Bottom => "45%",
+                St::Right => "0%",
+                St::Left => "0%",
+                St::BorderRadius => "10px",
+                St::BackgroundColor => "white",
+                },
         ],
-        g![
-            // left zoom lines
-            line_![attrs! { // bridge line
-                At::X1 => model.cursor_left_pos,
-                At::Y1 => "100",
-                At::X2 => "13",// pos +  stroke-width/2
-                At::Y2 => "400",
-                At::Style => "stroke:red; stroke-width:0.15",
-            },],
-            polygon![
-                simple_ev("pointerdown", Msg::GrabbedLeft),
-                attrs! {
-                    At::Points => format!("{},{} {},{} {},{}", model.cursor_left_pos, 100
-                    , model.cursor_left_pos-5., 400, model.cursor_left_pos+5., 400),
-                    At::FillOpacity => "0.5",
+        div![
+            style! {
+                St::Position => "absolute",
+                St::Top => "45%",
+                St::Bottom => "45%",
+                St::Right => "10%", // from 0% to 100% = progress bar
+                St::Left => "0%",
+                St::BorderRadius => "10px",
+                St::BackgroundColor => "red",
                 },
-            ],
+        ],],
+        svg![
+        // Full screen button
+         style! {
+            St::Position => "absolute",
+            St::Top => "10px",
+            St::Right => "10px",
+            St::Height => "20px",
+            St::Width => "20px",
+        },
+        attrs![At::ViewBox => "0 0 24 24", At::Fill => "white"],
+        path![attrs![At::D => "M21.414 5.414l2.586 2.586v-8h-8l2.586 2.586-2.414 2.414h-8.344l-2.414-2.414 2.586-2.586h-8v8l2.586-2.586 2.414 2.414v8.344l-2.414 2.414-2.586-2.586v8h8l-2.586-2.586 2.414-2.414h8.344l2.414 2.414-2.586 2.586h8v-8l-2.586 2.586-2.414-2.414v-8.344z"]]
         ],
-        g![
-            // right zoom lines
-            line_![attrs! {
-                At::X1 => model.cursor_right_pos,
-                At::Y1 => "100",
-                At::X2 => "87",
-                At::Y2 => "400",
-                At::Style => "stroke:red; stroke-width:0.15",
-            },],
-            polygon![
-                simple_ev("pointerdown", Msg::GrabbedRight),
-                attrs! {
-                    At::Points => format!("{},{} {},{} {},{}", model.cursor_right_pos, 100
-                    , model.cursor_right_pos-5., 400, model.cursor_right_pos+5., 400),
-                    At::FillOpacity => "0.5",
-                },
-            ],
-        ]
     ];
-
+    //
     div![
+        el_ref(&model.video_container),
         style! {St::Width => "100%", St::Height => "100%", St::Overflow => "hidden", St::Margin => "auto"},
         video![
             el_ref(&model.video),
-            attrs! {At::Width => "100%", At::Height => "80%", At::Controls => ""},
-            style! {St::Margin => "auto"},
+            attrs! {At::Controls => "", At::Width => "100%", At::Height => "90%"},
+            style! {St::Display => "block", St::Margin => "auto"},
             source![
-                // attrs! {At::Src => "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4", At::Type => "video/mp4"}
                 attrs! {At::Src => "http://192.168.15.29:8001/stream", At::Type => "video/mp4"}
-            ]
+            ],
         ],
-        div![style! {St::Height => "20%"},attrs! {At::Id => "video_timeline"}, video_timeline],
+        div![
+            style! {
+                St::Display => "flex";
+                St::JustifyContent => "space-between";
+                St::Height => "40px";
+                St::BackgroundColor => "rgba(26,26,26,.8)";
+                St::Position => "relative";
+                St::Top => "-80px";
+            },
+            attrs! {At::Id => "video_buttons"},
+            video_timeline,
+            // button![
+            //     attrs! {At::Class => "btn btn-primary bnt-sm"},
+            //     style! {St::LineHeight => "70%"; St::Border => "1px"; St::BorderRadius => "5px"; St::Padding => "0px"; St::Width => "9%"; St::Height => "70%";St::Margin => "auto"},
+            //     "5s"
+            // ],
+            // button![
+            //     attrs! {At::Class => "btn btn-primary bnt-sm"},
+            //     style! {St::LineHeight => "70%"; St::Border => "1px"; St::BorderRadius => "5px"; St::Padding => "0px"; St::Width => "9%"; St::Height => "70%";St::Margin => "auto"},
+            //     "10s"
+            // ],
+            // button![
+            //     attrs! {At::Class => "btn btn-primary bnt-sm"},
+            //     style! {St::LineHeight => "70%"; St::Border => "1px"; St::BorderRadius => "5px"; St::Padding => "0px"; St::Width => "9%"; St::Height => "70%";St::Margin => "auto"},
+            //     "20s"
+            // ],
+        ],
     ]
 }
 
