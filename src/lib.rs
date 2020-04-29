@@ -6,50 +6,46 @@ pub fn is_full_screen() -> bool{
 }
 struct Model {
     pub video: ElRef<HtmlVideoElement>,
+    pub progress_bar: ElRef<Element>,
     pub playing: bool,
     pub video_container: ElRef<Element>,
     pub percentage_watched: f64,
+    pub controls_opacity: f64,
+    pub last_wake: f64,
 }
 
 impl Default for Model {
     fn default() -> Self {
         Self {
             video: ElRef::default(),
+            progress_bar: Default::default(),
             playing: false,
             video_container: ElRef::default(),
-            // video_timeline: ElRef::default(),
             percentage_watched: 0.,
+            controls_opacity: 0.0,
+            last_wake: js_sys::Date::now()
         }
     }
 }
 
 #[derive(Clone)]
 enum Msg {
-    SetTime(web_sys::PointerEvent),
     Fullscreen,
     FullscreenChanged,
+    TooglePlayPause,
     Play,
     Pause,
+    SeekTo(web_sys::PointerEvent),
+    AddSec(f64),
+    WakeControls,
+    SleepControls,
+    Nothing,
 }
 
 fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
 
 
     match msg {
-        Msg::SetTime(event) => {
-            // let el = model.video.get().expect("No video el");
-            // let total_duration = el.duration();
-            // let x = event.client_x();
-            // let y = event.client_y();
-            // let video_timeline = model.video_timeline.get().unwrap();
-            // let p = video_timeline.create_svg_point();
-            // p.set_x(x as f32);
-            // p.set_y(y as f32);
-            // let ctm = video_timeline.get_screen_ctm().unwrap().inverse().unwrap();
-            // let k = p.matrix_transform(&ctm);
-            // model.percentage_watched = (k.x() as f64 - 5.) * 1.111 / 100.;
-            // el.set_current_time(model.percentage_watched * total_duration);
-        }
         Msg::Fullscreen => {
             if is_full_screen(){
                 document().exit_fullscreen();
@@ -69,11 +65,54 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
         Msg::FullscreenChanged => {
             orders.render();
         }
+        Msg::SeekTo(pointer_ev) => {
+            let progress_bar_html = model.progress_bar.get().unwrap();
+            let width = progress_bar_html.get_bounding_client_rect().width();
+            let x = progress_bar_html.get_bounding_client_rect().x();
+            let c_x = pointer_ev.client_x();
+            let perc = (c_x as f64 -x)/width;
+            let video = model.video.get().unwrap();
+            let duration = video.duration();
+            video.set_current_time(perc*duration);
+            model.percentage_watched = perc;
+        }
+        Msg::AddSec(secs) => {
+            let video = model.video.get().unwrap();
+            let curr_time = video.current_time();
+            video.set_current_time(curr_time+secs);
+        }
+        Msg::TooglePlayPause => {
+            if model.playing{
+                model.video.get().unwrap().pause();
+            }else{
+                model.video.get().unwrap().play();
+            }
+            model.playing = !model.playing;
+        }
+        Msg::Nothing => {}
+        Msg::WakeControls => {
+            model.controls_opacity = 1.;
+            model.last_wake = js_sys::Date::now();
+            orders.perform_cmd(start_sleep_controls_timer());
+        },
+        Msg::SleepControls => {
+            if js_sys::Date::now()-model.last_wake > (1_500. - 200.){
+                model.controls_opacity = 0.;
+            }
+        }
     }
 }
 
+async fn start_sleep_controls_timer() -> Result<Msg, Msg>{
+    use gloo_timers::future::TimeoutFuture;
+    TimeoutFuture::new(1_500).await;
+    Ok(Msg::SleepControls)
+}
+
 fn view(model: &Model) -> impl View<Msg> {
+    let watched_perc = format!("{}%", 100.*(1.-model.percentage_watched));
     let video_timeline = div![
+
         style! {
         St::Width => "100%",
         St::Height => "100%",
@@ -114,20 +153,23 @@ fn view(model: &Model) -> impl View<Msg> {
         },
         div![
         // Timeline container
+        pointer_ev(Ev::PointerDown, Msg::SeekTo),
         style! {
                 St::Position => "absolute",
-                St::Top => "0%",
-                St::Bottom => "0%",
+                St::Top => "25%",
+                St::Bottom => "25%",
                 St::Right => "190px",
                 St::Left => "45px",
                 St::BackgroundColor => "transparent",
                 },
         div![
         // Video timeline
+        el_ref(&model.progress_bar),
+        pointer_ev(Ev::PointerDown, Msg::SeekTo),
             style! {
                 St::Position => "absolute",
-                St::Top => "45%",
-                St::Bottom => "45%",
+                St::Top => "35%",
+                St::Bottom => "35%",
                 St::Right => "0%",
                 St::Left => "0%",
                 St::BorderRadius => "10px",
@@ -136,11 +178,12 @@ fn view(model: &Model) -> impl View<Msg> {
         ],
         div![
         // Video fill timeline
+            pointer_ev(Ev::PointerDown, Msg::SeekTo),
             style! {
                 St::Position => "absolute",
-                St::Top => "45%",
-                St::Bottom => "45%",
-                St::Right => "10%", // from 0% to 100% = progress bar
+                St::Top => "35%",
+                St::Bottom => "35%",
+                St::Right => watched_perc, // from 0% to 100% = progress bar
                 St::Left => "0%",
                 St::BorderRadius => "10px",
                 St::BackgroundColor => "red",
@@ -152,10 +195,9 @@ fn view(model: &Model) -> impl View<Msg> {
                 St::Position => "absolute",
                 St::Width => "12.5px",
                 St::Height => "12.5px",
-                St::Top => "13.75px",
-                // St::Bottom => "45%",
-                St::Right => "10%", // from 0% to 100% = progress bar
-                // St::Left => "0%",
+                St::Top => "calc(12.5% + 1px)",
+                // from 0% to 100% = progress bar, but reversed. Also need to account for the ball size
+                St::Right => format!("calc({}% - 6.25px)", 100.*(1.-model.percentage_watched))
                 St::BorderRadius => "50%",
                 St::BackgroundColor => "red",
                 },
@@ -176,6 +218,7 @@ fn view(model: &Model) -> impl View<Msg> {
         ],
 
         button![
+        simple_ev(Ev::Click, Msg::AddSec(-30.)),
         style! {
             // second right most button
             St::Position => "absolute",
@@ -192,6 +235,7 @@ fn view(model: &Model) -> impl View<Msg> {
         "-30s"],
 
         button![
+        simple_ev(Ev::Click, Msg::AddSec(-5.)),
         style! {
             // third right most button
             St::Position => "absolute",
@@ -208,6 +252,7 @@ fn view(model: &Model) -> impl View<Msg> {
         "-5s"],
 
         button![
+        simple_ev(Ev::Click, Msg::AddSec(5.)),
         style! {
             // second right most button
             St::Position => "absolute",
@@ -224,6 +269,7 @@ fn view(model: &Model) -> impl View<Msg> {
         "+5s"],
 
         button![
+        simple_ev(Ev::Click, Msg::AddSec(30.)),
         style! {
             // right most button
             St::Position => "absolute",
@@ -243,8 +289,11 @@ fn view(model: &Model) -> impl View<Msg> {
 
     div![
         el_ref(&model.video_container),
+        simple_ev(Ev::PointerDown, Msg::WakeControls),
+        simple_ev(Ev::PointerMove, Msg::WakeControls),
         style! {St::Width => "100%", St::Height => "100%", St::Overflow => "hidden", St::Margin => "auto"},
         video![
+            simple_ev(Ev::PointerDown, Msg::TooglePlayPause),
             el_ref(&model.video),
             attrs! {At::Width => "100%", At::Height => if is_full_screen() {"100%"} else { "90%" };},
             style! {St::Display => "block", St::Margin => "auto"},
@@ -255,12 +304,13 @@ fn view(model: &Model) -> impl View<Msg> {
         div![
             id!["video_controls"],
             style! {
+                St::Opacity => model.controls_opacity;
                 St::Display => "flex";
                 St::JustifyContent => "space-between";
                 St::Height => "40px";
                 St::BackgroundColor => "rgba(26,26,26,1.0)";
                 St::Position => "relative";
-                St::Top => if (is_full_screen()) {"-40px"} else{ "-40px" };
+                St::Top => "-40px";
             },
             video_timeline,
         ],
@@ -287,10 +337,16 @@ pub fn render() {
 
 
 
-fn my_window_events(model: &Model) -> Vec<EventHandler<Msg>> {
+fn my_window_events(_model: &Model) -> Vec<EventHandler<Msg>> {
 
     let mut result = Vec::new();
-    result.push(simple_ev("onfullscreenchange", Msg::FullscreenChanged));
+    result.push(keyboard_ev("keydown", |ev| {
+        if ev.key() == " " {
+            Msg::TooglePlayPause
+        }else{
+            Msg::Nothing
+        }
+    }));
     result
 }
 
