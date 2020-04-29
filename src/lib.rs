@@ -10,6 +10,7 @@ struct Model {
     pub progress_bar: ElRef<Element>,
     pub playing: bool,
     pub video_container: ElRef<Element>,
+    pub video_selector_container: ElRef<Element>,
     pub percentage_watched: f64,
     pub controls_opacity: f64,
     pub last_wake: f64,
@@ -24,6 +25,7 @@ impl Default for Model {
             progress_bar: Default::default(),
             playing: false,
             video_container: ElRef::default(),
+            video_selector_container: Default::default(),
             percentage_watched: 0.,
             controls_opacity: 0.0,
             last_wake: js_sys::Date::now(),
@@ -65,6 +67,7 @@ enum Msg {
     WakeControls,
     SleepControls,
     MoviesDataFetched(seed::fetch::FetchObject<AvailableMovies>),
+    ScrollMoviesView,
     FetchMoviesData,
     ChangeSrc(String),
     ReloadLoadPlayer,
@@ -138,6 +141,10 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 a.timestamp.cmp(&b.timestamp)
             });
             model.movies_data = Some(data);
+            orders.after_next_render(|_|{
+                Msg::ScrollMoviesView
+            });
+
         }
         Msg::FetchMoviesData => {
             orders.perform_cmd(fetch_data()).skip();
@@ -157,11 +164,16 @@ fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
                 Msg::Play
             });
         }
+        Msg::ScrollMoviesView => {
+            let cont = model.video_selector_container.get().unwrap();
+            cont.set_scroll_left(cont.scroll_width());
+
+        }
     }
 }
 
 async fn fetch_data() -> Result<Msg, Msg> {
-    let url = "http://localhost:8001/movies";
+    let url = "http://192.168.15.28:8000/movies";
     seed::Request::new(url)
         .fetch_json(Msg::MoviesDataFetched)
         .await
@@ -178,8 +190,8 @@ fn view(model: &Model) -> impl View<Msg> {
     let mut els = Vec::new();
     if let Some(movie) = &model.movies_data{
         for past_day_movie in &movie.past_day_movies{
-            let src = format!("http://192.168.15.29:8001/stream/{}", past_day_movie.filename);
-            els.push(div![
+            let src = format!("http://192.168.15.28:8000/stream/{}", past_day_movie.filename);
+            els.push(button![
                 simple_ev(Ev::Click, Msg::ChangeSrc(src)),
                     style! {
                     St::Display => "flex";
@@ -193,11 +205,13 @@ fn view(model: &Model) -> impl View<Msg> {
                     St::BorderRadius => "10px";
                     St::MarginLeft => "1%";
                     St::MarginRight => "1%";
+                    St::Border => "0";
+                    St::FontSize => "small";
                 },past_day_movie.formatted_date]);
         }
         for today_movie in &movie.today_movies{
-            let src = format!("http://192.168.15.29:8001/stream/{}", today_movie.filepath);
-            els.push(div![
+            let src = format!("http://192.168.15.28:8000/stream/{}", today_movie.filepath);
+            els.push(button![
                     simple_ev(Ev::Click, Msg::ChangeSrc(src)),
                     style! {
                     St::Display => "flex";
@@ -211,6 +225,8 @@ fn view(model: &Model) -> impl View<Msg> {
                     St::BorderRadius => "10px";
                     St::MarginLeft => "1%";
                     St::MarginRight => "1%";
+                    St::Border => "0";
+                    St::FontSize => "larger";
                 },today_movie.formatted_date]);
         }
     }
@@ -422,6 +438,7 @@ fn view(model: &Model) -> impl View<Msg> {
             video_timeline,
         ],
         div![
+            el_ref(&model.video_selector_container),
             // day/hour selector
             style! {
                 St::Display => "flex";
@@ -439,22 +456,6 @@ fn view(model: &Model) -> impl View<Msg> {
                 St::OverflowY => "auto";
             },
             els,
-            // (0..10).map(|_i|{
-            //     div![style! {
-            //         St::Display => "flex";
-            //         St::AlignItems => "center";
-            //         St::JustifyContent => "center";
-            //         St::Flex => "0 0 auto";
-            //         St::Height => "90%";
-            //         St::Width => "5rem";
-            //         St::BackgroundColor => "#007bff";
-            //         St::Color => "white";
-            //         St::BorderRadius => "10px";
-            //         St::MarginLeft => "1%";
-            //         St::MarginRight => "1%";
-            //     },"Some"]
-            // })
-
         ]
     ]
 }
